@@ -8,7 +8,13 @@ export class HapticFeedback {
 
   constructor() {
     // Check if vibration API is available
+    // On mobile devices, vibration should be available
     this.enabled = 'vibrate' in navigator;
+    
+    // Log for debugging
+    if (!this.enabled) {
+      console.log('Vibration API not available');
+    }
   }
 
   /**
@@ -18,10 +24,12 @@ export class HapticFeedback {
     if (!this.enabled) return;
     
     try {
-      navigator.vibrate(50); // Short vibration for regular beat
+      // Use a more noticeable vibration pattern for mobile
+      // Pattern: vibrate for 80ms
+      navigator.vibrate(80);
     } catch (error) {
-      console.warn('Vibration not supported:', error);
-      this.enabled = false;
+      console.warn('Vibration error:', error);
+      // Don't disable on error, might be temporary
     }
   }
 
@@ -32,10 +40,12 @@ export class HapticFeedback {
     if (!this.enabled) return;
     
     try {
-      navigator.vibrate([100, 50, 100]); // Longer, double vibration for downbeat
+      // Stronger vibration pattern for downbeat
+      // Pattern: vibrate 120ms, pause 30ms, vibrate 120ms
+      navigator.vibrate([120, 30, 120]);
     } catch (error) {
-      console.warn('Vibration not supported:', error);
-      this.enabled = false;
+      console.warn('Vibration error:', error);
+      // Don't disable on error, might be temporary
     }
   }
 

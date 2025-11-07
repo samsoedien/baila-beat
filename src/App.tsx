@@ -14,7 +14,9 @@ function App() {
   const [isDashBeat, setIsDashBeat] = useState(false);
   const [bpm, setBPM] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [hapticEnabled, setHapticEnabled] = useState(true);
+  // Enable haptic feedback by default, especially on mobile
+  const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const [hapticEnabled, setHapticEnabled] = useState(isMobileDevice);
   const [noMusicDetected, setNoMusicDetected] = useState(false);
 
   const audioProcessorRef = useRef<AudioProcessor | null>(null);
@@ -67,13 +69,17 @@ function App() {
     setIsDownbeat(counterState.isDownbeat);
     setIsDashBeat(counterState.isDashBeat);
 
-    // Haptic feedback (skip for dash beats)
+    // Haptic feedback (skip for dash beats 4 and 8)
+    // Vibrate on beats: 1, 2, 3, 5, 6, 7 (skipping 4 and 8)
     if (hapticEnabled && hapticFeedbackRef.current.isAvailable() && !counterState.isDashBeat) {
-      if (counterState.isDownbeat) {
-        hapticFeedbackRef.current.downbeat();
-      } else {
-        hapticFeedbackRef.current.beat();
-      }
+      // Add small delay to ensure vibration API works (some browsers need this)
+      setTimeout(() => {
+        if (counterState.isDownbeat) {
+          hapticFeedbackRef.current.downbeat();
+        } else {
+          hapticFeedbackRef.current.beat();
+        }
+      }, 0);
     }
   }, [hapticEnabled]);
 

@@ -27,9 +27,9 @@ export class AudioProcessor {
   private energyHistory: number[] = [];
   private beatHistory: number[] = [];
   private readonly historySize = 43; // ~1 second at 44.1kHz with 1024 buffer
-  private readonly energyThresholdMultiplier = 1.5; // Balance between detection and false positives
+  private readonly energyThresholdMultiplier = 1.3; // More sensitive for mobile devices
   private readonly downbeatInterval = 8; // 8 beats per cycle
-  private readonly minEnergyThreshold = 2; // Minimum absolute energy to filter out complete silence
+  private readonly minEnergyThreshold = 1; // Lower threshold for mobile devices
   
   // BPM calculation
   private bpmHistory: number[] = [];
@@ -47,11 +47,13 @@ export class AudioProcessor {
   async start(): Promise<void> {
     try {
       // Request microphone access
+      // On mobile, allow browser to optimize audio settings
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
+          echoCancellation: isMobile ? true : false, // Enable on mobile for better quality
+          noiseSuppression: isMobile ? true : false, // Enable on mobile
+          autoGainControl: isMobile ? true : false, // Enable on mobile for consistent levels
           sampleRate: 44100,
         },
       });
@@ -62,20 +64,27 @@ export class AudioProcessor {
       // Create microphone source
       this.microphone = this.audioContext.createMediaStreamSource(this.stream);
       
-      // Create band-pass filter for percussion frequencies
-      this.bandpassFilter = this.audioContext.createBiquadFilter();
-      this.bandpassFilter.type = 'bandpass';
-      this.bandpassFilter.frequency.value = 140; // Center frequency
-      this.bandpassFilter.Q.value = 1; // Quality factor
-      
       // Create analyser node
       this.analyser = this.audioContext.createAnalyser();
       this.analyser.fftSize = 2048;
       this.analyser.smoothingTimeConstant = 0.3;
       
-      // Connect: microphone -> bandpass -> analyser
-      this.microphone.connect(this.bandpassFilter);
-      this.bandpassFilter.connect(this.analyser);
+      // On mobile, connect directly to analyser (no bandpass filter)
+      // On desktop, use bandpass filter for better beat detection
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      
+      if (isMobile) {
+        // Mobile: direct connection for better sensitivity
+        this.microphone.connect(this.analyser);
+      } else {
+        // Desktop: use bandpass filter for percussion frequencies
+        this.bandpassFilter = this.audioContext.createBiquadFilter();
+        this.bandpassFilter.type = 'bandpass';
+        this.bandpassFilter.frequency.value = 140; // Center frequency
+        this.bandpassFilter.Q.value = 1; // Quality factor
+        this.microphone.connect(this.bandpassFilter);
+        this.bandpassFilter.connect(this.analyser);
+      }
       
       // Start processing
       this.processAudio();
@@ -198,8 +207,10 @@ export class AudioProcessor {
     const threshold = avgEnergy + (this.energyThresholdMultiplier * standardDeviation);
     
     // Beat detected if current energy exceeds threshold
-    // Also ensure current energy is at least slightly above average to avoid false positives
-    const beatDetected = currentEnergy > threshold && currentEnergy > avgEnergy * 1.1;
+    // More lenient threshold for mobile devices
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const relativeThreshold = isMobile ? 1.05 : 1.1; // Lower threshold for mobile
+    const beatDetected = currentEnergy > threshold && currentEnergy > avgEnergy * relativeThreshold;
     
     // Prevent multiple beats too close together (minimum 200ms apart)
     const now = performance.now();
