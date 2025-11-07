@@ -44,7 +44,7 @@ export function BeatCounter({ currentBeat, cycle, isDownbeat, isDashBeat = false
         flexDirection: 'column', 
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '3rem',
+        gap: '2rem',
         flex: 1,
         width: '100%',
       }}>
@@ -79,7 +79,7 @@ export function BeatCounter({ currentBeat, cycle, isDownbeat, isDashBeat = false
       flexDirection: 'column', 
       alignItems: 'center',
       justifyContent: 'center',
-      gap: '3rem',
+      gap: '2rem',
       flex: 1,
       width: '100%',
     }}>

@@ -28,7 +28,6 @@ export class AudioProcessor {
   private beatHistory: number[] = [];
   private readonly historySize = 43; // ~1 second at 44.1kHz with 1024 buffer
   private readonly energyThresholdMultiplier = 1.5; // Balance between detection and false positives
-  private readonly varianceMultiplier = 0.3;
   private readonly downbeatInterval = 8; // 8 beats per cycle
   private readonly minEnergyThreshold = 2; // Minimum absolute energy to filter out complete silence
   

@@ -1,5 +1,6 @@
 {
   "buildCommand": "yarn build",
   "outputDirectory": "dist",
-  "framework": "vite"
+  "framework": "vite",
+  "installCommand": "yarn install --ignore-scripts && yarn install"
 }

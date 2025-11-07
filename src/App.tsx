@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { AudioProcessor, BeatDetectionResult } from './utils/audioProcessor';
-import { BeatCounter as BeatCounterUtil, BeatCounterState } from './utils/beatCounter';
+import { BeatCounter as BeatCounterUtil } from './utils/beatCounter';
 import { HapticFeedback } from './utils/hapticFeedback';
 import { BeatCounter } from './components/BeatCounter';
 import { BPMDisplay } from './components/BPMDisplay';
@@ -21,9 +21,9 @@ function App() {
   const beatCounterRef = useRef<BeatCounterUtil>(new BeatCounterUtil());
   const hapticFeedbackRef = useRef<HapticFeedback>(new HapticFeedback());
   const lastBeatTimeRef = useRef<number>(0);
-  const noMusicTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const noMusicTimerRef = useRef<number | null>(null);
   const hasDetectedBeatRef = useRef<boolean>(false);
-  const musicStoppedTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const musicStoppedTimerRef = useRef<number | null>(null);
   const NO_MUSIC_TIMEOUT = 2000; // 2 seconds without beats = music stopped
 
   const handleBeat = useCallback((result: BeatDetectionResult) => {
