@@ -27,9 +27,9 @@ export class AudioProcessor {
   private energyHistory: number[] = [];
   private beatHistory: number[] = [];
   private readonly historySize = 43; // ~1 second at 44.1kHz with 1024 buffer
-  private readonly energyThresholdMultiplier = 1.3; // More sensitive for mobile devices
+  private readonly energyThresholdMultiplier = 1.5; // Original threshold
   private readonly downbeatInterval = 8; // 8 beats per cycle
-  private readonly minEnergyThreshold = 1; // Lower threshold for mobile devices
+  private readonly minEnergyThreshold = 2; // Minimum energy threshold
   
   // BPM calculation
   private bpmHistory: number[] = [];
@@ -46,9 +46,11 @@ export class AudioProcessor {
 
   async start(): Promise<void> {
     try {
+      // Detect mobile device once
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      
       // Request microphone access
       // On mobile, allow browser to optimize audio settings
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: isMobile ? true : false, // Enable on mobile for better quality
@@ -59,7 +61,14 @@ export class AudioProcessor {
       });
 
       // Create audio context
+      // Use 44.1kHz for consistency across devices (standard audio sample rate)
       this.audioContext = new AudioContext({ sampleRate: 44100 });
+      
+      // iOS requires audio context to be resumed after user interaction
+      // Resume if suspended (common on iOS)
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+      }
       
       // Create microphone source
       this.microphone = this.audioContext.createMediaStreamSource(this.stream);
@@ -67,24 +76,16 @@ export class AudioProcessor {
       // Create analyser node
       this.analyser = this.audioContext.createAnalyser();
       this.analyser.fftSize = 2048;
-      this.analyser.smoothingTimeConstant = 0.3;
+      this.analyser.smoothingTimeConstant = 0.3; // Same smoothing for both mobile and desktop
       
-      // On mobile, connect directly to analyser (no bandpass filter)
-      // On desktop, use bandpass filter for better beat detection
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-      
-      if (isMobile) {
-        // Mobile: direct connection for better sensitivity
-        this.microphone.connect(this.analyser);
-      } else {
-        // Desktop: use bandpass filter for percussion frequencies
-        this.bandpassFilter = this.audioContext.createBiquadFilter();
-        this.bandpassFilter.type = 'bandpass';
-        this.bandpassFilter.frequency.value = 140; // Center frequency
-        this.bandpassFilter.Q.value = 1; // Quality factor
-        this.microphone.connect(this.bandpassFilter);
-        this.bandpassFilter.connect(this.analyser);
-      }
+      // Use bandpass filter for percussion frequencies on both mobile and desktop
+      // This helps focus on the frequency range where beats are most prominent
+      this.bandpassFilter = this.audioContext.createBiquadFilter();
+      this.bandpassFilter.type = 'bandpass';
+      this.bandpassFilter.frequency.value = 140; // Center frequency
+      this.bandpassFilter.Q.value = 1; // Quality factor
+      this.microphone.connect(this.bandpassFilter);
+      this.bandpassFilter.connect(this.analyser);
       
       // Start processing
       this.processAudio();
@@ -130,6 +131,13 @@ export class AudioProcessor {
 
   private processAudio(): void {
     if (!this.analyser) return;
+    
+    // Ensure audio context is running (iOS sometimes suspends it)
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      this.audioContext.resume().catch(err => {
+        console.warn('Failed to resume audio context:', err);
+      });
+    }
 
     const bufferLength = this.analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
@@ -207,9 +215,8 @@ export class AudioProcessor {
     const threshold = avgEnergy + (this.energyThresholdMultiplier * standardDeviation);
     
     // Beat detected if current energy exceeds threshold
-    // More lenient threshold for mobile devices
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    const relativeThreshold = isMobile ? 1.05 : 1.1; // Lower threshold for mobile
+    const relativeThreshold = isMobile ? 1.1 : 1.1; // Original threshold
     const beatDetected = currentEnergy > threshold && currentEnergy > avgEnergy * relativeThreshold;
     
     // Prevent multiple beats too close together (minimum 200ms apart)
