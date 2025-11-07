@@ -13,6 +13,7 @@ function App() {
   const [isDownbeat, setIsDownbeat] = useState(false);
   const [isDashBeat, setIsDashBeat] = useState(false);
   const [bpm, setBPM] = useState(0);
+  const currentBPMRef = useRef<number>(0); // Track current BPM for beat counter
   const [error, setError] = useState<string | null>(null);
   // Enable haptic feedback by default, especially on mobile
   const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -35,9 +36,19 @@ function App() {
     if (now - lastBeatTimeRef.current < 100) {
       return;
     }
+    
+    // Only process beats if energy is high enough (actual music, not background noise)
+    // This prevents false beats from background noise when music stops
+    const MIN_VALID_ENERGY = 2.5; // Higher threshold to filter out noise
+    if (result.energy < MIN_VALID_ENERGY) {
+      // Energy too low, don't count as valid beat
+      // Don't reset the timer - let it continue counting
+      return;
+    }
+    
     lastBeatTimeRef.current = now;
 
-    // Clear no music warning when beats are detected
+    // Clear no music warning when valid beats are detected
     hasDetectedBeatRef.current = true;
     setNoMusicDetected(false);
     if (noMusicTimerRef.current) {
@@ -49,7 +60,7 @@ function App() {
       musicStoppedTimerRef.current = null;
     }
     
-    // Set timer to check if music stops (no beats for a while)
+    // Set timer to check if music stops (no valid beats for a while)
     musicStoppedTimerRef.current = setTimeout(() => {
       setNoMusicDetected(true);
       // Reset beat counter when music stops
@@ -60,8 +71,8 @@ function App() {
       setBPM(0);
     }, NO_MUSIC_TIMEOUT);
 
-    // Update beat counter
-    const counterState = beatCounterRef.current.updateBeat(result.downbeat, result.timestamp);
+    // Update beat counter with current BPM for consistent timing
+    const counterState = beatCounterRef.current.updateBeat(result.downbeat, result.timestamp, currentBPMRef.current);
     
     // Update UI for all beats (including dash beats 4 and 8)
     setCurrentBeat(counterState.currentBeat);
@@ -85,6 +96,7 @@ function App() {
 
   const handleBPMUpdate = useCallback((newBPM: number) => {
     setBPM(newBPM);
+    currentBPMRef.current = newBPM; // Update ref for beat counter
   }, []);
 
   const startListening = async () => {
